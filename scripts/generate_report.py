@@ -73,6 +73,18 @@ def chip_list(items, empty_text, field="term"):
     return "".join(chips)
 
 
+def visit_label(p):
+    """Build visit label: visit name + visit point if available."""
+    v = compact_visit(p.get("visit", ""))
+    vp = p.get("visit_point", "")
+    if vp and vp != v:
+        # Format numeric visit points as "V{n}"
+        vp_formatted = vp
+        if vp.isdigit():
+            vp_formatted = f"V{vp}"
+        return f"{v}<br><small>{e(vp_formatted)}</small>"
+    return v
+
 def item_table(item):
     """Generate the data table for a single subject-test item."""
     visit_rows = item.get("all_visits", [])
@@ -118,11 +130,9 @@ def item_table(item):
         elif p.get("direction") == "低":
             direction_arrow = "↓"
 
-        visit_name = compact_visit(p.get("visit", ""))
-
         rows_html.append(
             f'<tr class="{row_cls}">'
-            f'<td>{e(visit_name)}</td>'
+            f'<td>{visit_label(p)}</td>'
             f'<td class="{val_cls}">{fmt_num(p.get("result"))}</td>'
             f'<td>{e(p.get("unit", ""))}</td>'
             f'<td>{e(ref_range)}</td>'
@@ -131,7 +141,6 @@ def item_table(item):
             f'<td>{cs_html}</td>'
             f'<td class="desc-cell">{e(desc)}</td>'
             f'<td>{pct}</td>'
-            f'<td class="cfdi-cell">-</td>'
             f'</tr>'
         )
 
@@ -139,7 +148,6 @@ def item_table(item):
         '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
         '<th>访视</th><th>结果</th><th>单位</th><th>参考范围</th><th>方向</th>'
         '<th>CTCAE</th><th>临床意义</th><th>临床意义解释</th><th>较基线变化</th>'
-        '<th>核查判断/回复建议</th>'
         '</tr></thead><tbody>' + "".join(rows_html) + "</tbody></table></div>"
     )
 
@@ -420,7 +428,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",
 .tbl th{{background:#1a1a2e;color:white;padding:5px 6px;text-align:left;white-space:nowrap;font-weight:600}}
 .tbl td{{padding:4px 6px;border-bottom:1px solid #f0f0f0}}
 .tbl tr:hover{{background:#f4f6f8}}
-.baseline-row{{background:#fffde7}}
+.baseline-row{{background:#e3f2fd}}
 .v-hi{{color:#e74c3c;font-weight:700}}
 .v-lo{{color:#2471a3;font-weight:700}}
 .cs,.ncs,.ctcae-badge{{display:inline-block;padding:1px 5px;border-radius:2px;font-size:9px;font-weight:700}}

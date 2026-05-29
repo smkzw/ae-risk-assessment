@@ -7,7 +7,7 @@ Auto-detects sheet types and extracts lab, vital signs, ECG, AE, MH, CM data.
 import json
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -170,14 +170,17 @@ def parse_lab_rows(ws, sheet_type):
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "采样日期", "检查日期", "LBDAT")
     visit_col = match_col(headers, r"访视|VISIT")
+    visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     test_col = col_index(headers, "实验室指标名称", "检查项目", "指标名称", "LBTEST")
     result_col = col_index(headers, "结果", "检查结果", "LBORRES", "VSORRES")
     unit_col = col_index(headers, "单位", "LBORRESU", "VSORRESU")
     lo_col = col_index(headers, "下限", "正常值范围下限", "LBORNRL")
     hi_col = col_index(headers, "上限", "正常值范围上限", "LBORNRH")
     cs_col = col_index(headers, "临床评估", "临床意义", "LBCLSIG", "VSCLSIG")
-    desc_col = col_index(headers, "异常说明", "备注", "LBCO", "VSCO", "若异常有临床意义，请说明",
+    desc_col = col_index(headers, "异常说明", "若异常有临床意义，请说明",
                          "若异常，请详述", "异常，请说明")
+    desc_link_col = col_index(headers, "动态链接")
+    note_col = col_index(headers, "备注", "LBCO", "VSCO", "EGCO")
     ae_col = col_index(headers, "不良事件", "AE", "AENO", "VSAENO")
     mh_col = col_index(headers, "其他既往及现病史", "MHNO")
     perf_col = col_index(headers, "是否检查", "是否评估", "是否测量")
@@ -204,8 +207,11 @@ def parse_lab_rows(ws, sheet_type):
         unit = norm(row[unit_col]) if unit_col is not None else ""
         cs = norm(row[cs_col]) if cs_col is not None else ""
         desc = norm(row[desc_col]) if desc_col is not None else ""
+        desc_link = norm(row[desc_link_col]) if desc_link_col is not None else ""
+        note = norm(row[note_col]) if note_col is not None else ""
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
+        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
@@ -216,6 +222,7 @@ def parse_lab_rows(ws, sheet_type):
             "subj": subj,
             "center": center,
             "visit": visit,
+            "visit_point": visit_point,
             "date": date,
             "test": test_name,
             "result": result,
@@ -224,6 +231,8 @@ def parse_lab_rows(ws, sheet_type):
             "hi": hi,
             "cs": cs,
             "desc": desc,
+            "desc_link": desc_link,
+            "note": note,
             "ae_ref": ae_ref,
             "mh_ref": mh_ref,
             "source_sheet": sheet_type,
@@ -246,14 +255,16 @@ def parse_vs_rows(ws):
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "检查日期", "测量日期", "VSDAT")
     visit_col = match_col(headers, r"访视|VISIT")
+    visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     test_col = col_index(headers, "检查项目", "VSTEST")
     result_col = col_index(headers, "检查结果", "VSORRES", "结果")
     unit_col = col_index(headers, "单位", "VSORRESU")
     cs_col = col_index(headers, "临床评估", "VSCLSIG")
-    desc_col = col_index(headers, "异常说明", "备注", "VSCO", "异常，请说明")
+    desc_col = col_index(headers, "异常说明", "异常，请说明", "若异常有临床意义，请说明")
     ae_col = col_index(headers, "不良事件", "VSAENO")
     mh_col = col_index(headers, "其他既往及现病史", "VSMHNO")
     perf_col = col_index(headers, "是否检查")
+    note_col = col_index(headers, "备注", "VSCO")
 
     records = []
     for row in rows_data[1:]:
@@ -271,13 +282,15 @@ def parse_vs_rows(ws):
         desc = norm(row[desc_col]) if desc_col is not None else ""
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
+        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
         records.append({
-            "subj": subj, "center": center, "visit": visit, "date": date,
+            "subj": subj, "center": center, "visit": visit, "visit_point": visit_point, "date": date,
             "test": test_name, "result": result, "unit": unit,
             "lo": None, "hi": None, "cs": cs, "desc": desc,
+            "desc_link": "", "note": norm(row[note_col]) if note_col is not None else "",
             "ae_ref": norm(row[ae_col]) if ae_col is not None else "",
             "mh_ref": norm(row[mh_col]) if mh_col is not None else "",
             "source_sheet": "VS",
@@ -298,9 +311,11 @@ def parse_eg_rows(ws):
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "检查日期", "EGDAT")
     visit_col = match_col(headers, r"访视|VISIT")
+    visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     cs_col = col_index(headers, "临床评估", "EGCLSIG")
-    desc_col = col_index(headers, "异常说明", "备注", "EGCO", "若异常有临床意义，请说明",
+    desc_col = col_index(headers, "异常说明", "若异常有临床意义，请说明",
                          "若异常，请详述")
+    note_col = col_index(headers, "备注", "EGCO")
     ae_col = col_index(headers, "不良事件", "EGAENO")
     mh_col = col_index(headers, "其他既往及现病史", "EGMHNO")
     perf_col = col_index(headers, "是否检查")
@@ -325,11 +340,13 @@ def parse_eg_rows(ws):
             continue
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
+        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
         cs = norm(row[cs_col]) if cs_col is not None else ""
         desc = norm(row[desc_col]) if desc_col is not None else ""
+        note = norm(row[note_col]) if note_col is not None else ""
         ae_ref = norm(row[ae_col]) if ae_col is not None else ""
         mh_ref = norm(row[mh_col]) if mh_col is not None else ""
 
@@ -339,9 +356,10 @@ def parse_eg_rows(ws):
             result = to_float(row[test_col])
             if result is not None:
                 records.append({
-                    "subj": subj, "center": center, "visit": visit, "date": date,
+                    "subj": subj, "center": center, "visit": visit, "visit_point": visit_point, "date": date,
                     "test": test_name, "result": result, "unit": "ms" if "QT" in test_name or "QRS" in test_name or "PR" in test_name or "RR" in test_name else "bpm",
                     "lo": None, "hi": None, "cs": cs, "desc": desc,
+                    "desc_link": "", "note": note,
                     "ae_ref": ae_ref, "mh_ref": mh_ref,
                     "source_sheet": "EG",
                 })
@@ -361,6 +379,7 @@ def parse_hw_rows(ws):
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "测量日期", "检查日期", "HWDAT")
     visit_col = match_col(headers, r"访视|VISIT")
+    visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     weight_col = col_index(headers, "体重", "WEIGHT")
     height_col = col_index(headers, "身高", "HEIGHT")
     bmi_col = col_index(headers, "BMI")
@@ -375,6 +394,7 @@ def parse_hw_rows(ws):
             continue
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
+        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
@@ -383,18 +403,20 @@ def parse_hw_rows(ws):
             weight = to_float(row[weight_col])
             if weight is not None:
                 records.append({
-                    "subj": subj, "center": center, "visit": visit, "date": date,
+                    "subj": subj, "center": center, "visit": visit, "visit_point": visit_point, "date": date,
                     "test": "体重", "result": weight, "unit": "kg",
                     "lo": None, "hi": None, "cs": "", "desc": "",
+                    "desc_link": "", "note": "",
                     "ae_ref": "", "mh_ref": "", "source_sheet": "HW",
                 })
         if bmi_col is not None:
             bmi = to_float(row[bmi_col])
             if bmi is not None:
                 records.append({
-                    "subj": subj, "center": center, "visit": visit, "date": date,
+                    "subj": subj, "center": center, "visit": visit, "visit_point": visit_point, "date": date,
                     "test": "BMI", "result": bmi, "unit": "kg/m²",
                     "lo": None, "hi": None, "cs": "", "desc": "",
+                    "desc_link": "", "note": "",
                     "ae_ref": "", "mh_ref": "", "source_sheet": "HW",
                 })
 
@@ -643,7 +665,7 @@ def parse_listing(xlsx_path):
     if not has_lab_hem and not has_lab_chem:
         result["warnings"].append("未发现实验室检查(LB_HEM/LB_CHEM)相关sheet。")
 
-    # Filter out tests only present in screening
+    # Filter out tests only present in screening/baseline
     test_visit_phases = defaultdict(set)
     for rec in result["lab_records"]:
         phase = classify_visit(rec.get("visit", ""))
@@ -664,6 +686,70 @@ def parse_listing(xlsx_path):
             if rec["test"] not in excluded_tests
         ]
         result["test_names"] = {t for t in result["test_names"] if t not in excluded_tests}
+
+    # Filter out single-occurrence tests (only 1 record across ALL subjects)
+    test_counts = Counter(rec["test"] for rec in result["lab_records"])
+    single_tests = [t for t, c in test_counts.items() if c <= 1]
+    if single_tests:
+        result["warnings"].append(
+            f"以下指标在整个研究中仅有一次检测记录，已排除分析: {', '.join(single_tests)}"
+        )
+        result["lab_records"] = [
+            rec for rec in result["lab_records"] if rec["test"] not in single_tests
+        ]
+        result["test_names"] = {t for t in result["test_names"] if t not in single_tests}
+
+    # Build visit label mapping from SV records
+    # Maps (subj, date) → visit name for enriching records with missing visit names
+    visit_label_map = {}
+    for subj, visits in result.get("sv_records", {}).items():
+        for v in visits:
+            d = v.get("date")
+            vn = v.get("visit", "")
+            if d and vn:
+                key = (subj, d)
+                if key not in visit_label_map:
+                    visit_label_map[key] = vn
+
+    # Enrich visit labels: if visit is just a date, try to map to actual visit name
+    enriched_count = 0
+    for rec in result["lab_records"]:
+        visit = rec.get("visit", "")
+        date = rec.get("date", "")
+        sv_key = (rec["subj"], date) if date else None
+        # If visit looks like a date-only or is empty, use SV mapping
+        if sv_key and sv_key in visit_label_map:
+            sv_visit = visit_label_map[sv_key]
+            if not visit or re.match(r'\d{4}-\d{2}-\d{2}', visit):
+                rec["visit"] = sv_visit
+                enriched_count += 1
+
+    if enriched_count > 0:
+        result["warnings"].append(
+            f"通过SV访视表补充了 {enriched_count} 条记录的访视名称。"
+        )
+
+    # Detect CS="异常有临床意义" but no explanation
+    cs_missing_desc = []
+    for rec in result["lab_records"]:
+        cs = norm(rec.get("cs", ""))
+        desc = norm(rec.get("desc", ""))
+        desc_link = norm(rec.get("desc_link", ""))
+        note = norm(rec.get("note", ""))
+        combined = desc or desc_link or note
+        if any(k in cs for k in ("有临床意义", "CS")) and "无临床意义" not in cs and not combined:
+            cs_missing_desc.append(
+                {"subj": rec["subj"], "test": rec["test"], "visit": rec.get("visit", ""), "sheet": rec.get("source_sheet", "")}
+            )
+    if cs_missing_desc:
+        samples = cs_missing_desc[:5]
+        sample_strs = [f"{s['subj']}/{s['test']}({s['visit']})" for s in samples]
+        result["cs_missing_desc"] = cs_missing_desc
+        result["warnings"].append(
+            f"发现 {len(cs_missing_desc)} 条评估为CS（异常有临床意义）但临床意义解释为空的记录。"
+            f"示例: {', '.join(sample_strs)}。"
+            "请确认data listing中哪一列可获知临床意义解释（如'动态链接'列中的'AE：xxx'/'MH：xxx'等）。"
+        )
 
     # Sort records by subject, visit rank, date
     result["lab_records"].sort(key=lambda r: (

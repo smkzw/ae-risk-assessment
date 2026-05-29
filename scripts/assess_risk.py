@@ -311,8 +311,18 @@ def assess_risk(parsed_data, ctcae_index, non_ctcae_threshold=20):
             # Determine if CTCAE upgraded from baseline
             ctcae_upgraded = bool(grade and base_grade and grade > base_grade)
 
+            # Rule 1: Baseline abnormal → baseline normal → NOT a risk item
+            bl_is_ab, _ = is_abnormal(base_result, baseline.get("lo"), baseline.get("hi"))
+            if bl_is_ab and not is_ab and not ctcae_upgraded:
+                # Baseline was abnormal, post is normal, no CTCAE upgrade → skip
+                is_ab = False
+
+            # Combine desc from multiple sources: desc, desc_link, note
+            combined_desc = rec.get("desc", "") or rec.get("desc_link", "") or rec.get("note", "")
+
             rec_info = {
                 "visit": rec.get("visit", ""),
+                "visit_point": rec.get("visit_point", ""),
                 "date": rec.get("date"),
                 "result": result,
                 "lo": lo,
@@ -321,7 +331,7 @@ def assess_risk(parsed_data, ctcae_index, non_ctcae_threshold=20):
                 "is_ab": is_ab,
                 "direction": direction,
                 "cs": rec.get("cs", ""),
-                "desc": rec.get("desc", ""),
+                "desc": combined_desc,
                 "ae_ref": rec.get("ae_ref", ""),
                 "mh_ref": rec.get("mh_ref", ""),
                 "grade": grade,
