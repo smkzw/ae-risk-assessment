@@ -90,15 +90,13 @@ def chip_list(items, empty_text, field="term"):
 
 
 def visit_label(p):
-    """Build visit label: visit name + visit point if available."""
+    """Build visit label: compact visit name + V{n} sub-label.
+    Only shows V{n} when extracted from visit name AND not already in compacted name."""
     v = compact_visit(p.get("visit", ""))
     vp = p.get("visit_point", "")
-    if vp and vp != v:
-        # Format numeric visit points as "V{n}"
-        vp_formatted = vp
-        if vp.isdigit():
-            vp_formatted = f"V{vp}"
-        return f"{v}<br><small>{e(vp_formatted)}</small>"
+    # Show V{n} only when it exists AND is not already part of the compacted name
+    if vp and vp not in v:
+        return f"{v}<br><small>{e(vp)}</small>"
     return v
 
 def item_table(item):
@@ -146,9 +144,15 @@ def item_table(item):
         elif p.get("direction") == "低":
             direction_arrow = "↓"
 
+        # Date format: "2025-08-12" → "08-12" (month-day only for compactness)
+        date_str = p.get("date") or "-"
+        if date_str and len(date_str) >= 10:
+            date_str = date_str[5:10]  # Extract MM-DD
+
         rows_html.append(
             f'<tr class="{row_cls}">'
             f'<td>{visit_label(p)}</td>'
+            f'<td class="date-cell">{e(date_str)}</td>'
             f'<td class="{val_cls}">{fmt_num(p.get("result"))}</td>'
             f'<td>{e(p.get("unit", ""))}</td>'
             f'<td>{e(ref_range)}</td>'
@@ -162,7 +166,7 @@ def item_table(item):
 
     return (
         '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-        '<th>访视</th><th>结果</th><th>单位</th><th>参考范围</th><th>方向</th>'
+        '<th>访视</th><th>日期</th><th>结果</th><th>单位</th><th>参考范围</th><th>方向</th>'
         '<th>CTCAE</th><th>临床意义</th><th>临床意义解释</th><th>较基线变化</th>'
         '</tr></thead><tbody>' + "".join(rows_html) + "</tbody></table></div>"
     )
@@ -459,6 +463,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",
 .ncs{{background:#e3f2fd;color:#1565c0}}
 .ctcae-badge{{background:#f3e5f5;color:#6a1b9a}}
 .desc-cell{{max-width:200px;font-size:9px;color:#5d6d7e;word-break:break-word}}
+.date-cell{{font-size:9px;color:#7f8c8d;white-space:nowrap}}
 .cfdi-cell{{max-width:300px;font-size:9px;color:#5d6d7e;word-break:break-word}}
 .footer{{text-align:center;padding:20px;color:#bdc3c7;font-size:11px;border-top:1px solid #e0e0e0;margin-top:20px}}
 </style>

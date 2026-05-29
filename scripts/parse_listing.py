@@ -68,6 +68,16 @@ def to_date(x):
     return s
 
 
+def extract_visit_point(visit_name):
+    """Extract V{n} from visit name like '筛选/导入期V1（D-7~D-1）' → 'V1'.
+    Only returns V{n} if the visit name actually contains it. Returns '' otherwise."""
+    s = norm(visit_name)
+    m = re.search(r'V(\d+)', s)
+    if m:
+        return f"V{m.group(1)}"
+    return ""
+
+
 def col_index(headers, *candidates):
     """Find the first matching column name from candidates."""
     for h, idx in headers.items():
@@ -214,7 +224,7 @@ def parse_lab_rows(ws, sheet_type):
         note = norm(row[note_col]) if note_col is not None else ""
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
-        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
+        visit_point = extract_visit_point(visit)
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
@@ -287,7 +297,7 @@ def parse_vs_rows(ws):
         desc = norm(row[desc_col]) if desc_col is not None else ""
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
-        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
+        visit_point = extract_visit_point(visit)
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
@@ -347,7 +357,7 @@ def parse_eg_rows(ws):
             continue
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
-        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
+        visit_point = extract_visit_point(visit)
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
@@ -403,7 +413,7 @@ def parse_hw_rows(ws):
             continue
         date = to_date(row[date_col]) if date_col is not None else None
         visit = norm(row[visit_col]) if visit_col is not None else date or ""
-        visit_point = norm(row[visit_point_col]) if visit_point_col is not None else ""
+        visit_point = extract_visit_point(visit)
         center = norm(row[center_col]) if center_col is not None else (
             norm(row[center_id_col]) if center_id_col is not None else ""
         )
