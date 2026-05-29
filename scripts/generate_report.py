@@ -47,12 +47,28 @@ def risk_class(r):
 
 
 def compact_visit(v):
-    """Shorten visit name for display."""
+    """Shorten visit name for display. Handles 数据节 format like '筛选/导入期V1（D-7~D-1）'."""
     s = norm(v)
+    # Special cases: keep the main label, not the parenthetical
+    if "提前退出" in s:
+        return "提前退出"
+    if "计划外" in s:
+        return "计划外访视"
+    if "筛选" in s:
+        # Extract V{n} portion: "筛选/导入期V1（D-7~D-1）" → "V1"
+        m = re.search(r"V(\d+)", s)
+        if m:
+            return f"筛选V{m.group(1)}"
+        return "筛选"
+    # Extract parenthetical content (e.g. "D29±1d" from "双盲治疗期V5（D29±1d）")
     m = re.search(r"（([^）]+)）", s)
     if m:
         return m.group(1)
     s = s.replace("双盲治疗期-", "").replace("开放治疗期-", "")
+    # Extract V{n} from remaining
+    m = re.search(r"V(\d+)", s)
+    if m:
+        return m.group(0)
     if len(s) > 20:
         return s[:20] + "..."
     return s
@@ -104,10 +120,10 @@ def item_table(item):
             row_cls = "baseline-row"
 
         cs_raw = p.get("cs") or "正常"
-        if "临床意义" in cs_raw or "CS" in norm(cs_raw):
-            cs_html = '<span class="cs">CS</span>'
-        elif "无临床" in cs_raw or "NCS" in norm(cs_raw):
+        if "无临床意义" in cs_raw or "NCS" in norm(cs_raw):
             cs_html = '<span class="ncs">NCS</span>'
+        elif "有临床意义" in cs_raw or norm(cs_raw).strip().upper() == "CS":
+            cs_html = '<span class="cs">CS</span>'
         else:
             cs_html = e(cs_raw)
 
@@ -181,9 +197,15 @@ def item_card(item):
     flags.append(f'<span class="flag flag-info">{e(item.get("explain_eval", ""))}</span>')
 
     # Build AE/MH/CM info boxes
+    group_badge = ""
+    group = item.get("group", "")
+    if group:
+        group_cls = "badge-info" if "试验" in group else "badge-neutral"
+        group_badge = f'<span class="badge {group_cls}">{e(group)}</span>'
+
     return f"""
 <div class="subject-card br-{rc}" id="{e(item['subj'] + '_' + item['test'])}" data-subj="{e(item['subj'])}" data-risk="{e(item['risk'])}" data-test="{e(item['test'])}">
-  <div class="s-head"><span class="s-id">{e(item['subj'])} / {e(item['test'].split('（')[0])}</span><div class="s-badges">{''.join(badges)}</div></div>
+  <div class="s-head"><span class="s-id">{e(item['subj'])} / {e(item['test'].split('（')[0])}</span>{group_badge}<div class="s-badges">{''.join(badges)}</div></div>
   <div class="flag-strip">{''.join(flags)}</div>
   <div class="info-row">
     <div class="info-box"><h4>相关AE</h4>{chip_list(item.get('ae'), '无相关AE')}</div>
@@ -407,6 +429,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",
 .badge-warn{{background:#fff8e1;color:#e65100}}
 .badge-ok{{background:#e8f5e9;color:#2e7d32}}
 .badge-info{{background:#e3f2fd;color:#1565c0}}
+.badge-neutral{{background:#f5f5f5;color:#616161}}
 .badge-jak{{background:#fce4ec;color:#c62828}}
 .flag-strip{{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}}
 .flag{{display:inline-block;padding:2px 6px;border-radius:2px;font-size:10px;font-weight:600}}

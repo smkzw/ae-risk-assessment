@@ -80,9 +80,16 @@ def main():
     tests_unknown = sum(1 for v in ctcae_index.values() if v.get("unknown"))
     print(f"  ✓ CTCAE覆盖: {tests_with} 项 | 无CTCAE分级: {tests_without} 项 | 未确认: {tests_unknown} 项")
 
+    # Step 2b: Parse Group Table (before risk assessment)
+    groups = {}
+    if args.group_table:
+        from parse_listing import parse_group_table
+        groups = parse_group_table(args.group_table)
+        print(f"  ✓ 分组信息: {len(groups)} 受试者")
+
     # Step 3: Risk Assessment
     print(f"\n[3/4] 执行风险分析 (非CTCAE指标阈值: {args.threshold}%)...")
-    results = assess_risk(parsed_data, ctcae_index, args.threshold)
+    results = assess_risk(parsed_data, ctcae_index, args.threshold, groups)
 
     # Build output dict
     assessment = {
@@ -127,13 +134,6 @@ def main():
         str(listing_path.name),
     )
     print(f"  ✓ HTML报告: {report_path}")
-
-    # Group table
-    if args.group_table:
-        from parse_listing import parse_group_table
-        groups = parse_group_table(args.group_table)
-        print(f"  ✓ 分组信息: {len(groups)} 受试者")
-
     print(f"\n{'=' * 60}")
     print("全部完成。输出文件:")
     print(f"  解析数据: {parsed_path}")

@@ -169,7 +169,10 @@ def parse_lab_rows(ws, sheet_type):
     center_col = col_index(headers, "试验中心名称", "中心名称", "研究中心", "Site")
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "采样日期", "检查日期", "LBDAT")
-    visit_col = match_col(headers, r"访视|VISIT")
+    # Priority: 数据节 > 访视 > VISIT (per SKILL.md 4.3b)
+    visit_col = col_index(headers, "数据节")
+    if visit_col is None:
+        visit_col = match_col(headers, r"访视|VISIT")
     visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     test_col = col_index(headers, "实验室指标名称", "检查项目", "指标名称", "LBTEST")
     result_col = col_index(headers, "结果", "检查结果", "LBORRES", "VSORRES")
@@ -254,7 +257,9 @@ def parse_vs_rows(ws):
     center_col = col_index(headers, "试验中心名称", "中心名称", "研究中心")
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "检查日期", "测量日期", "VSDAT")
-    visit_col = match_col(headers, r"访视|VISIT")
+    visit_col = col_index(headers, "数据节")
+    if visit_col is None:
+        visit_col = match_col(headers, r"访视|VISIT")
     visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     test_col = col_index(headers, "检查项目", "VSTEST")
     result_col = col_index(headers, "检查结果", "VSORRES", "结果")
@@ -310,7 +315,9 @@ def parse_eg_rows(ws):
     center_col = col_index(headers, "试验中心名称", "中心名称", "研究中心")
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "检查日期", "EGDAT")
-    visit_col = match_col(headers, r"访视|VISIT")
+    visit_col = col_index(headers, "数据节")
+    if visit_col is None:
+        visit_col = match_col(headers, r"访视|VISIT")
     visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     cs_col = col_index(headers, "临床评估", "EGCLSIG")
     desc_col = col_index(headers, "异常说明", "若异常有临床意义，请说明",
@@ -378,7 +385,9 @@ def parse_hw_rows(ws):
     center_col = col_index(headers, "试验中心名称", "中心名称", "研究中心")
     center_id_col = col_index(headers, "试验中心编号", "中心编号")
     date_col = col_index(headers, "测量日期", "检查日期", "HWDAT")
-    visit_col = match_col(headers, r"访视|VISIT")
+    visit_col = col_index(headers, "数据节")
+    if visit_col is None:
+        visit_col = match_col(headers, r"访视|VISIT")
     visit_point_col = match_col(headers, r"访视点|访视窗|时间点|TPT|VISITPOINT|INSTANCE")
     weight_col = col_index(headers, "体重", "WEIGHT")
     height_col = col_index(headers, "身高", "HEIGHT")
@@ -502,7 +511,9 @@ def parse_sv_rows(ws):
     headers = {h: i for i, h in enumerate(headers_raw) if h}
 
     subj_col = col_index(headers, "受试者编号", "受试者", "SUBJID")
-    visit_col = match_col(headers, r"访视|VISIT")
+    visit_col = col_index(headers, "数据节")
+    if visit_col is None:
+        visit_col = match_col(headers, r"访视|VISIT")
     date_col = col_index(headers, "访视日期", "VISDAT")
 
     visits = {}

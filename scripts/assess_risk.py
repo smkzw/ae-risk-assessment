@@ -217,23 +217,44 @@ def term_relevance(test_name, ae_mh_terms, direction=""):
 
 
 def parse_ae_mh_from_desc(desc):
-    """Extract AE/MH numbers from description text."""
+    """
+    Extract AE/MH numbers from description text.
+    Supports multiple EDC formats:
+      - "AE1", "MH3" (direct)
+      - "AE 1", "MH 3" (spaced)
+      - "MH+4+血小板减少" (plus-delimited, e.g. Rave/Inform EDC)
+      - "AE+1+血胆红素增高" (plus-delimited)
+    Returns list of (type, number) tuples.
+    """
     if not desc:
         return []
     refs = []
+    seen = set()
+    # Pattern 1: plus-delimited "MH+4+术语" or "AE+1+术语"
+    for m in re.finditer(r"(AE|MH)\+(\d+)\+", desc, re.IGNORECASE):
+        key = (m.group(1).upper(), int(m.group(2)))
+        if key not in seen:
+            seen.add(key)
+            refs.append(key)
+    # Pattern 2: direct "AE1" / "MH3" or spaced "AE 1" / "MH 3"
     for m in re.finditer(r"(AE|MH)\s*(\d+)", desc, re.IGNORECASE):
-        refs.append((m.group(1).upper(), int(m.group(2))))
+        key = (m.group(1).upper(), int(m.group(2)))
+        if key not in seen:
+            seen.add(key)
+            refs.append(key)
     return refs
 
 
-def assess_risk(parsed_data, ctcae_index, non_ctcae_threshold=20):
+def assess_risk(parsed_data, ctcae_index, non_ctcae_threshold=20, groups=None):
     """
     Main risk assessment function.
     Returns categorized results.
+    groups: optional dict of {subj_id: group_name}
     """
     lab_records = parsed_data["lab_records"]
     ae_records = parsed_data.get("ae_records", [])
     mh_records = parsed_data.get("mh_records", [])
+    groups = groups or {}
 
     # Build AE/MH lookup
     ae_lookup = defaultdict(list)
@@ -517,6 +538,7 @@ def assess_risk(parsed_data, ctcae_index, non_ctcae_threshold=20):
             "ctcae_upgrade_count": ctcae_upgrade_count,
             "baseline_change_10pct_count": pct10_count,
             "explain_eval": explain_eval,
+            "group": groups.get(subj, ""),
         }
         results[center][test].append(item)
 
